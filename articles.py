@@ -49,7 +49,7 @@ def worker(i):
     title = article['titleHtml']
     content = article['textHtml']
     reading_count = article['statistics']['readingCount']
-    author = article['author']['login']
+    author = article['author']['alias']
     score = article['statistics']['score']
 
     try:
