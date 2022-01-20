@@ -6,19 +6,6 @@ import requests
 import logging
 import argparse
 
-sql_worker = Sqlite3Worker("habr.db")
-sql_worker.execute("CREATE TABLE IF NOT EXISTS comments("
-                   "id              INTEGER,"
-                   "parent_id       INTEGER,"
-                   "article         INTEGER,"
-                   "level           INTEGER,"
-                   "timePublished   TEXT,"
-                   "score           INTEGER,"
-                   "message         TEXT,"
-                   "children        TEXT,"
-                   "author          TEXT)"
-                   )
-
 
 def worker(i):
     url = "https://m.habr.com/kek/v2/articles/{}/comments/?fl=ru%2Cen&hl=ru".format(i)
@@ -58,7 +45,7 @@ def worker(i):
                     score,
                     message,
                     str(children),
-                    str(author['login']))
+                    str(author['alias']))
         except:
             data = (None, None, None, None, None, None, None, None, None)
 
@@ -67,18 +54,39 @@ def worker(i):
         logging.info("Comments on article {} were parsed".format(i))
 
 
-parser = argparse.ArgumentParser(description='Habr comments parser. Specify the maximum and minimum number of articles.')
-parser.add_argument('--min', action="store", dest="min", required=True, type=int)
-parser.add_argument('--max', action="store", dest="max", required=True, type=int)
-parser.add_argument('--threads', action="store", dest="threads_count", help="number of threads", default=3, type=int)
-args = parser.parse_args()
+if __name__ == '__main__':
 
-pool = ThreadPool(args.threads_count)
+    parser = argparse.ArgumentParser(description='Habr comments parser. Specify the maximum and minimum number of articles.')
+    parser.add_argument('--min', action="store", dest="min", type=int, default=490000)
+    parser.add_argument('--max', action="store", dest="max", type=int, default=500000)
+    parser.add_argument('--threads', action="store", dest="threads_count", help="number of threads", default=3, type=int)
+    args = parser.parse_args()
 
-start_time = datetime.now()
-results = pool.map(worker, range(args.min, args.max))
+    sql_worker = Sqlite3Worker("habr.db")
+    sql_worker.execute("CREATE TABLE IF NOT EXISTS comments("
+                       "id              INTEGER,"
+                       "parent_id       INTEGER,"
+                       "article         INTEGER,"
+                       "level           INTEGER,"
+                       "timePublished   TEXT,"
+                       "score           INTEGER,"
+                       "message         TEXT,"
+                       "children        TEXT,"
+                       "author          TEXT)"
+                       )
 
-pool.close()
-pool.join()
-sql_worker.close()
-print(datetime.now() - start_time)
+    start_time = datetime.now()
+
+    if args.threads_count == 1:
+        for article_num in range(args.min, args.max):
+            worker(article_num)
+
+    else:
+        pool = ThreadPool(args.threads_count)
+        pool.map(worker, range(args.min, args.max))
+
+        pool.close()
+        pool.join()
+
+    sql_worker.close()
+    print(datetime.now() - start_time)
